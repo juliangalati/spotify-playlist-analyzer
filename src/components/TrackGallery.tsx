@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { TrackRow } from '../types';
 import TrackCard from './TrackCard';
+import TrackListRow from './TrackListRow';
 
 type SortField = 'default' | 'bpm' | 'energy' | 'danceability' | 'valence' | 'camelot';
 type SortDir = 'asc' | 'desc';
@@ -52,7 +53,11 @@ function sortTracks(tracks: TrackRow[], sort: Sort): TrackRow[] {
 const MIN_COL_WIDTH = 220;
 const MIN_COL_WIDTH_MOBILE = 160;
 const ROW_HEIGHT = 380;
+const LIST_ROW_HEIGHT = 56;
 const GAP = 16;
+const LIST_GAP = 4;
+
+type ViewMode = 'grid' | 'list';
 
 type Props = {
   tracks: TrackRow[];
@@ -67,6 +72,7 @@ export default function TrackGallery({
 }: Props) {
   const [sort, setSort] = useState<Sort>({ field: 'default', dir: 'desc' });
   const [noDataOnly, setNoDataOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const noDataCount = useMemo(
     () => tracks.reduce((n, t) => (t.features == null ? n + 1 : n), 0),
     [tracks]
@@ -78,9 +84,14 @@ export default function TrackGallery({
     return list;
   }, [tracks, noDataOnly, keyFilter]);
   const sorted = useMemo(() => sortTracks(filtered, sort), [filtered, sort]);
+  const positionById = useMemo(() => {
+    const map = new Map<string, number>();
+    tracks.forEach((t, i) => map.set(t.id, i + 1));
+    return map;
+  }, [tracks]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [columns, setColumns] = useState(4);
+  const [gridColumns, setGridColumns] = useState(4);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -90,12 +101,16 @@ export default function TrackGallery({
         const width = entry.contentRect.width;
         const minW = window.innerWidth <= 768 ? MIN_COL_WIDTH_MOBILE : MIN_COL_WIDTH;
         const cols = Math.max(1, Math.floor((width + GAP) / (minW + GAP)));
-        setColumns(cols);
+        setGridColumns(cols);
       }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  const columns = viewMode === 'list' ? 1 : gridColumns;
+  const rowHeight = viewMode === 'list' ? LIST_ROW_HEIGHT : ROW_HEIGHT;
+  const rowGap = viewMode === 'list' ? LIST_GAP : GAP;
 
   const rows = useMemo(() => {
     const out: TrackRow[][] = [];
@@ -108,9 +123,13 @@ export default function TrackGallery({
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT + GAP,
-    overscan: 4,
+    estimateSize: () => rowHeight + rowGap,
+    overscan: viewMode === 'list' ? 10 : 4,
   });
+
+  useEffect(() => {
+    virtualizer.measure();
+  }, [viewMode, virtualizer]);
 
   function onPillClick(field: SortField) {
     setSort((prev) => {
@@ -125,10 +144,41 @@ export default function TrackGallery({
 
   return (
     <section>
-      <h3>
-        Tracks ({sorted.length}
-        {filterActive && sorted.length !== tracks.length ? ` of ${tracks.length}` : ''})
-      </h3>
+      <div className="tracks-header">
+        <h3>
+          Tracks ({sorted.length}
+          {filterActive && sorted.length !== tracks.length ? ` of ${tracks.length}` : ''})
+        </h3>
+        <div className="view-toggle" role="group" aria-label="View mode">
+          <button
+            className={`view-toggle-btn${viewMode === 'grid' ? ' active' : ''}`}
+            onClick={() => setViewMode('grid')}
+            aria-pressed={viewMode === 'grid'}
+            title="Grid view"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <rect x="1" y="1" width="5" height="5" rx="1" />
+              <rect x="8" y="1" width="5" height="5" rx="1" />
+              <rect x="1" y="8" width="5" height="5" rx="1" />
+              <rect x="8" y="8" width="5" height="5" rx="1" />
+            </svg>
+            Grid
+          </button>
+          <button
+            className={`view-toggle-btn${viewMode === 'list' ? ' active' : ''}`}
+            onClick={() => setViewMode('list')}
+            aria-pressed={viewMode === 'list'}
+            title="List view"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <rect x="1" y="2" width="12" height="2" rx="1" />
+              <rect x="1" y="6" width="12" height="2" rx="1" />
+              <rect x="1" y="10" width="12" height="2" rx="1" />
+            </svg>
+            List
+          </button>
+        </div>
+      </div>
       {keyFilter && (
         <div className="filter-chips">
           <button
@@ -169,7 +219,22 @@ export default function TrackGallery({
           No data ({noDataCount})
         </button>
       </div>
-      <div className="gallery-scroll" ref={scrollRef}>
+      <div className={`gallery-scroll${viewMode === 'list' ? ' list-mode' : ''}`} ref={scrollRef}>
+        {viewMode === 'list' && (
+          <div className="track-list-header">
+            <span className="list-pos">#</span>
+            <span />
+            <span>Title</span>
+            <span className="list-stats">
+              <span className="list-bpm">BPM</span>
+              <span className="list-camelot">Key</span>
+              <span className="list-metric">E</span>
+              <span className="list-metric">D</span>
+              <span className="list-metric">V</span>
+            </span>
+            <span className="list-duration">Time</span>
+          </div>
+        )}
         <div
           className="gallery-rows"
           style={{ height: virtualizer.getTotalSize() }}
@@ -180,15 +245,30 @@ export default function TrackGallery({
             return (
               <div
                 key={vr.key}
-                className="gallery-row"
+                className={`gallery-row${viewMode === 'list' ? ' list-row' : ''}`}
                 style={{
                   transform: `translateY(${vr.start}px)`,
-                  gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                  gridTemplateColumns:
+                    viewMode === 'list'
+                      ? '1fr'
+                      : `repeat(${columns}, minmax(0, 1fr))`,
                 }}
               >
-                {row.map((t) => (
-                  <TrackCard key={t.id} track={t} />
-                ))}
+                {row.map((t) =>
+                  viewMode === 'list' ? (
+                    <TrackListRow
+                      key={t.id}
+                      track={t}
+                      position={positionById.get(t.id)}
+                    />
+                  ) : (
+                    <TrackCard
+                      key={t.id}
+                      track={t}
+                      position={positionById.get(t.id)}
+                    />
+                  )
+                )}
               </div>
             );
           })}

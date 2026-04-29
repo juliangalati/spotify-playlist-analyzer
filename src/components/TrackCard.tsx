@@ -2,11 +2,17 @@ import type { TrackRow } from '../types';
 import { formatDuration, round } from '../util';
 import { keyName } from '../camelot';
 
-type Props = { track: TrackRow };
+type Props = { track: TrackRow; position?: number };
 
-export default function TrackCard({ track }: Props) {
+export default function TrackCard({ track, position }: Props) {
   const f = track.features;
   const artists = track.artists.map((a) => a.name).join(', ');
+  const posBadge =
+    position != null ? (
+      <span className="track-position" title={`Playlist position ${position}`}>
+        #{position}
+      </span>
+    ) : null;
 
   return (
     <div
@@ -22,11 +28,13 @@ export default function TrackCard({ track }: Props) {
           aria-label={`Open ${track.name} on Spotify`}
         >
           {track.cover ? <img src={track.cover} alt="" /> : null}
+          {posBadge}
           <span className="track-duration">{formatDuration(track.duration_ms)}</span>
         </a>
       ) : (
         <div className="track-cover-wrap">
           {track.cover ? <img src={track.cover} alt="" /> : null}
+          {posBadge}
           <span className="track-duration">{formatDuration(track.duration_ms)}</span>
         </div>
       )}
