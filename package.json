@@ -1,0 +1,43 @@
+{
+  "name": "spotify-playlist-analyzer",
+  "version": "1.0.0",
+  "description": "Paste a public Spotify playlist URL and get a full audio-feature breakdown for every track — BPM, musical key, Camelot code, energy, danceability, valence, loudness — plus playlist-level aggregates and a Camelot Wheel that visualizes the playlist's key distribution.",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n web,server -c blue,magenta \"npm:dev:web\" \"npm:dev:server\"",
+    "dev:web": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc --noEmit && vite build && tsc -p tsconfig.server.json",
+    "start": "NODE_ENV=production node dist-server/index.js",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.13.24",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "d3": "^7.9.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/d3": "^7.4.3",
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10"
+  }
+}
