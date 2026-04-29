@@ -606,7 +606,7 @@ section { margin-bottom: 32px; }
 /* Track list header */
 .track-list-header {
   display: grid;
-  grid-template-columns: 28px 40px 1fr 340px 48px;
+  grid-template-columns: 28px 40px 1fr 340px 88px 88px 48px;
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
@@ -629,6 +629,11 @@ section { margin-bottom: 32px; }
   color: var(--text-muted);
   font-weight: 700;
 }
+.track-list-header .list-cost-header {
+  color: var(--text-muted);
+  font-weight: 700;
+  text-align: left;
+}
 .track-list-header .list-duration { text-align: right; }
 
 @media (max-width: 768px) {
@@ -637,13 +642,14 @@ section { margin-bottom: 32px; }
     gap: 10px;
     padding: 8px 10px;
   }
-  .track-list-header .list-stats { display: none; }
+  .track-list-header .list-stats,
+  .track-list-header .list-cost-header { display: none; }
 }
 
 /* Track list row (compact) */
 .track-list-row {
   display: grid;
-  grid-template-columns: 28px 40px 1fr 340px 48px;
+  grid-template-columns: 28px 40px 1fr 340px 88px 88px 48px;
   align-items: center;
   gap: 12px;
   padding: 6px 12px;
@@ -725,13 +731,81 @@ section { margin-bottom: 32px; }
   margin-top: 0;
 }
 
+.list-cost {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.list-cost.empty { visibility: hidden; }
+.list-cost-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-interactive);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 20px;
+}
+.list-cost-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+.list-cost-value {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 22px;
+  text-align: right;
+}
+
 @media (max-width: 768px) {
   .track-list-row {
     grid-template-columns: 24px 36px 1fr 48px;
     gap: 10px;
     padding: 6px 10px;
   }
-  .list-stats { display: none; }
+  .list-stats,
+  .track-list-row > .list-cost { display: none; }
+}
+
+/* Transition histogram */
+.transition-histogram {
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.transition-histogram-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.transition-histogram-scale {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+.transition-histogram-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 36px;
+}
+.transition-histogram-bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.2s ease;
 }
 
 /* JSON panel */

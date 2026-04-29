@@ -3,6 +3,12 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { TrackRow } from '../types';
 import TrackCard from './TrackCard';
 import TrackListRow from './TrackListRow';
+import {
+  computeIsolationCosts,
+  computeTransitionCosts,
+  costColor,
+  TRANSITION_MAX,
+} from '../transition';
 
 type SortField = 'default' | 'bpm' | 'energy' | 'danceability' | 'valence' | 'camelot';
 type SortDir = 'asc' | 'desc';
@@ -89,6 +95,32 @@ export default function TrackGallery({
     tracks.forEach((t, i) => map.set(t.id, i + 1));
     return map;
   }, [tracks]);
+
+  const transitionCosts = useMemo(() => computeTransitionCosts(sorted), [sorted]);
+  const isolationCosts = useMemo(() => computeIsolationCosts(sorted), [sorted]);
+  const costByIndex = useMemo(() => {
+    const m = new Map<string, { transition: number | null; isolation: number | null }>();
+    sorted.forEach((t, i) => {
+      m.set(t.id, {
+        transition: transitionCosts[i] ?? null,
+        isolation: isolationCosts[i] ?? null,
+      });
+    });
+    return m;
+  }, [sorted, transitionCosts, isolationCosts]);
+
+  const transitionHistogram = useMemo(() => {
+    const buckets = 10;
+    const counts = new Array<number>(buckets).fill(0);
+    let seen = 0;
+    for (const c of transitionCosts) {
+      if (c == null) continue;
+      seen += 1;
+      const idx = Math.min(buckets - 1, Math.floor((c / TRANSITION_MAX) * buckets));
+      counts[idx] += 1;
+    }
+    return { counts, seen };
+  }, [transitionCosts]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [gridColumns, setGridColumns] = useState(4);
@@ -219,6 +251,29 @@ export default function TrackGallery({
           No data ({noDataCount})
         </button>
       </div>
+      {viewMode === 'list' && transitionHistogram.seen > 0 && (
+        <div className="transition-histogram" title="Distribution of transition costs (lower = smoother)">
+          <div className="transition-histogram-label">
+            Transition cost distribution
+            <span className="transition-histogram-scale">smooth → jarring</span>
+          </div>
+          <div className="transition-histogram-bars">
+            {transitionHistogram.counts.map((count, i) => {
+              const max = Math.max(...transitionHistogram.counts, 1);
+              const h = (count / max) * 100;
+              const midCost = ((i + 0.5) / transitionHistogram.counts.length) * TRANSITION_MAX;
+              return (
+                <span
+                  key={i}
+                  className="transition-histogram-bar"
+                  style={{ height: `${h}%`, background: costColor(midCost) }}
+                  title={`${count} transition${count === 1 ? '' : 's'} in this range`}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className={`gallery-scroll${viewMode === 'list' ? ' list-mode' : ''}`} ref={scrollRef}>
         {viewMode === 'list' && (
           <div className="track-list-header">
@@ -232,6 +287,8 @@ export default function TrackGallery({
               <span className="list-metric">D</span>
               <span className="list-metric">V</span>
             </span>
+            <span className="list-cost-header" title="Distance from previous track">Trans.</span>
+            <span className="list-cost-header" title="Distance to nearest other track">Isol.</span>
             <span className="list-duration">Time</span>
           </div>
         )}
@@ -254,12 +311,15 @@ export default function TrackGallery({
                       : `repeat(${columns}, minmax(0, 1fr))`,
                 }}
               >
-                {row.map((t) =>
-                  viewMode === 'list' ? (
+                {row.map((t) => {
+                  const costs = costByIndex.get(t.id);
+                  return viewMode === 'list' ? (
                     <TrackListRow
                       key={t.id}
                       track={t}
                       position={positionById.get(t.id)}
+                      transitionCost={costs?.transition ?? null}
+                      isolationCost={costs?.isolation ?? null}
                     />
                   ) : (
                     <TrackCard
@@ -267,8 +327,8 @@ export default function TrackGallery({
                       track={t}
                       position={positionById.get(t.id)}
                     />
-                  )
-                )}
+                  );
+                })}
               </div>
             );
           })}

@@ -1,9 +1,43 @@
 import type { TrackRow } from '../types';
 import { formatDuration, round } from '../util';
+import { costColor, costWidthPct } from '../transition';
 
-type Props = { track: TrackRow; position?: number };
+type Props = {
+  track: TrackRow;
+  position?: number;
+  transitionCost?: number | null;
+  isolationCost?: number | null;
+};
 
-export default function TrackListRow({ track, position }: Props) {
+function CostCell({ cost, label }: { cost: number | null | undefined; label: string }) {
+  if (cost == null) {
+    return <span className="list-cost empty" aria-label={`${label}: n/a`} />;
+  }
+  const width = costWidthPct(cost);
+  const color = costColor(cost);
+  return (
+    <span
+      className="list-cost"
+      title={`${label}: ${cost.toFixed(2)}`}
+      aria-label={`${label}: ${cost.toFixed(2)}`}
+    >
+      <span className="list-cost-bar">
+        <span
+          className="list-cost-fill"
+          style={{ width: `${width}%`, background: color }}
+        />
+      </span>
+      <span className="list-cost-value">{cost.toFixed(1)}</span>
+    </span>
+  );
+}
+
+export default function TrackListRow({
+  track,
+  position,
+  transitionCost,
+  isolationCost,
+}: Props) {
   const f = track.features;
   const artists = track.artists.map((a) => a.name).join(', ');
 
@@ -30,6 +64,8 @@ export default function TrackListRow({ track, position }: Props) {
           <span className="missing-badge">No data</span>
         )}
       </div>
+      <CostCell cost={transitionCost} label="Transition cost from previous track" />
+      <CostCell cost={isolationCost} label="Distance to nearest other track" />
       <span className="list-duration">{formatDuration(track.duration_ms)}</span>
     </>
   );
