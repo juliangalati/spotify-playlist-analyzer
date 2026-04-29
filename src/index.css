@@ -327,7 +327,9 @@ section { margin-bottom: 32px; }
   background: linear-gradient(to right, rgba(30,215,96,0.15), rgba(30,215,96,1));
 }
 
-.wheel-segment { cursor: default; transition: opacity 0.2s; }
+.wheel-segment { cursor: default; transition: opacity 0.2s, fill-opacity 0.2s; }
+.wheel-segment.clickable { cursor: pointer; }
+.wheel-segment.clickable:hover { fill-opacity: 1; }
 .wheel-label {
   fill: var(--text-primary);
   font-family: var(--font-ui);
@@ -346,6 +348,37 @@ section { margin-bottom: 32px; }
   text-transform: uppercase;
   letter-spacing: 1.4px;
   text-anchor: middle;
+}
+
+/* Filter chips */
+.filter-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.filter-chip {
+  background: rgba(30, 215, 96, 0.12);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 9999px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s;
+}
+.filter-chip:hover { background: rgba(30, 215, 96, 0.2); }
+.filter-chip-x {
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 400;
 }
 
 /* Sort pills */

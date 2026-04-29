@@ -4,9 +4,15 @@ import { buildWheelSlots } from '../camelot';
 
 type Props = {
   keyDistribution: Record<string, number>;
+  selectedCode?: string | null;
+  onSelect?: (code: string) => void;
 };
 
-export default function CamelotWheel({ keyDistribution }: Props) {
+export default function CamelotWheel({
+  keyDistribution,
+  selectedCode = null,
+  onSelect,
+}: Props) {
   const ref = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
@@ -58,6 +64,8 @@ export default function CamelotWheel({ keyDistribution }: Props) {
 
       const count = keyDistribution[slot.code] ?? 0;
       const isTop = count > 0 && slot.code === topCode;
+      const isSelected = count > 0 && slot.code === selectedCode;
+      const clickable = count > 0 && onSelect != null;
 
       let fill: string;
       let fillOpacity = 1;
@@ -68,13 +76,29 @@ export default function CamelotWheel({ keyDistribution }: Props) {
         fillOpacity = Math.max(0.15, count / maxCount);
       }
 
-      g.append('path')
-        .attr('class', 'wheel-segment')
+      let stroke = '#121212';
+      let strokeWidth = 2;
+      if (isSelected) {
+        stroke = '#ffffff';
+        strokeWidth = 3;
+      } else if (isTop) {
+        stroke = '#1ed760';
+        strokeWidth = 2;
+      }
+
+      const path = g
+        .append('path')
+        .attr('class', `wheel-segment${clickable ? ' clickable' : ''}${isSelected ? ' selected' : ''}`)
         .attr('d', arc({ startAngle, endAngle, innerRadius: 0, outerRadius: 0 }) as string)
         .attr('fill', fill)
         .attr('fill-opacity', fillOpacity)
-        .attr('stroke', isTop ? '#1ed760' : '#121212')
-        .attr('stroke-width', isTop ? 2 : 2);
+        .attr('stroke', stroke)
+        .attr('stroke-width', strokeWidth);
+
+      if (clickable) {
+        path.on('click', () => onSelect!(slot.code));
+        path.append('title').text(`${slot.code} — ${count} track${count === 1 ? '' : 's'}`);
+      }
 
       const centerAngle = (startAngle + endAngle) / 2;
       const ringMid = isOuter ? (midR + outerR) / 2 : (innerR + midR) / 2;
@@ -104,7 +128,7 @@ export default function CamelotWheel({ keyDistribution }: Props) {
 
     g.append('text').attr('class', 'wheel-center').attr('y', -6).text('Camelot');
     g.append('text').attr('class', 'wheel-center').attr('y', 12).text('Wheel');
-  }, [keyDistribution]);
+  }, [keyDistribution, selectedCode, onSelect]);
 
   return (
     <section>

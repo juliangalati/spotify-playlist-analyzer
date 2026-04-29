@@ -20,6 +20,7 @@ export default function App() {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [payload, setPayload] = useState<AnalyzerPayload | null>(null);
   const [auth, setAuth] = useState<AuthState>({ loggedIn: false });
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAuthState().then(setAuth).catch(() => setAuth({ loggedIn: false }));
@@ -60,6 +61,7 @@ export default function App() {
     }
     setStatus({ kind: 'loading' });
     setPayload(null);
+    setSelectedKey(null);
     try {
       const p = await analyzePlaylist(id);
       setPayload(p);
@@ -149,8 +151,18 @@ export default function App() {
           <>
             <PlaylistHeader playlist={payload.playlist} coverage={payload.coverage} />
             <SummaryGrid aggregates={aggregates} />
-            <CamelotWheel keyDistribution={aggregates.key_distribution} />
-            <TrackGallery tracks={payload.tracks} />
+            <CamelotWheel
+              keyDistribution={aggregates.key_distribution}
+              selectedCode={selectedKey}
+              onSelect={(code) =>
+                setSelectedKey((prev) => (prev === code ? null : code))
+              }
+            />
+            <TrackGallery
+              tracks={payload.tracks}
+              keyFilter={selectedKey}
+              onClearKeyFilter={() => setSelectedKey(null)}
+            />
             <JsonPanel
               data={{
                 playlist: payload.playlist,

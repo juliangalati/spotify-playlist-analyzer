@@ -54,19 +54,29 @@ const MIN_COL_WIDTH_MOBILE = 160;
 const ROW_HEIGHT = 380;
 const GAP = 16;
 
-type Props = { tracks: TrackRow[] };
+type Props = {
+  tracks: TrackRow[];
+  keyFilter?: string | null;
+  onClearKeyFilter?: () => void;
+};
 
-export default function TrackGallery({ tracks }: Props) {
+export default function TrackGallery({
+  tracks,
+  keyFilter = null,
+  onClearKeyFilter,
+}: Props) {
   const [sort, setSort] = useState<Sort>({ field: 'default', dir: 'desc' });
   const [noDataOnly, setNoDataOnly] = useState(false);
   const noDataCount = useMemo(
     () => tracks.reduce((n, t) => (t.features == null ? n + 1 : n), 0),
     [tracks]
   );
-  const filtered = useMemo(
-    () => (noDataOnly ? tracks.filter((t) => t.features == null) : tracks),
-    [tracks, noDataOnly]
-  );
+  const filtered = useMemo(() => {
+    let list = tracks;
+    if (noDataOnly) list = list.filter((t) => t.features == null);
+    if (keyFilter) list = list.filter((t) => t.features?.camelot === keyFilter);
+    return list;
+  }, [tracks, noDataOnly, keyFilter]);
   const sorted = useMemo(() => sortTracks(filtered, sort), [filtered, sort]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -111,12 +121,26 @@ export default function TrackGallery({ tracks }: Props) {
     });
   }
 
+  const filterActive = noDataOnly || keyFilter != null;
+
   return (
     <section>
       <h3>
         Tracks ({sorted.length}
-        {noDataOnly && sorted.length !== tracks.length ? ` of ${tracks.length}` : ''})
+        {filterActive && sorted.length !== tracks.length ? ` of ${tracks.length}` : ''})
       </h3>
+      {keyFilter && (
+        <div className="filter-chips">
+          <button
+            className="filter-chip"
+            onClick={() => onClearKeyFilter?.()}
+            title="Clear key filter"
+          >
+            Key: {keyFilter}
+            <span aria-hidden="true" className="filter-chip-x">×</span>
+          </button>
+        </div>
+      )}
       <div className="sort-pills">
         {SORT_OPTIONS.map((opt) => {
           const active = sort.field === opt.field;
