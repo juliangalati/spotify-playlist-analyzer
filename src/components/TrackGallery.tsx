@@ -7,8 +7,12 @@ import {
   computeIsolationCosts,
   computeTransitionCosts,
   costColor,
+  cumulativeAverage,
+  movingAverage,
+  suggestedSmoothingWindow,
   TRANSITION_MAX,
 } from '../transition';
+import CostLineChart from './CostLineChart';
 
 type SortField = 'default' | 'bpm' | 'energy' | 'danceability' | 'valence' | 'camelot';
 type SortDir = 'asc' | 'desc';
@@ -108,6 +112,32 @@ export default function TrackGallery({
     });
     return m;
   }, [sorted, transitionCosts, isolationCosts]);
+
+  const trendSeries = useMemo(() => {
+    const transitionSamples = transitionCosts.reduce<number>(
+      (n, c) => (c == null ? n : n + 1),
+      0
+    );
+    const isolationSamples = isolationCosts.reduce<number>(
+      (n, c) => (c == null ? n : n + 1),
+      0
+    );
+    const transitionWindow = suggestedSmoothingWindow(transitionSamples);
+    const isolationWindow = suggestedSmoothingWindow(isolationSamples);
+    return {
+      transition: {
+        raw: transitionCosts,
+        smoothed: movingAverage(transitionCosts, transitionWindow),
+        cumulative: cumulativeAverage(transitionCosts),
+        window: transitionWindow,
+      },
+      isolation: {
+        raw: isolationCosts,
+        smoothed: movingAverage(isolationCosts, isolationWindow),
+        window: isolationWindow,
+      },
+    };
+  }, [transitionCosts, isolationCosts]);
 
   const transitionHistogram = useMemo(() => {
     const sampleCount = transitionCosts.reduce<number>((n, c) => (c == null ? n : n + 1), 0);
@@ -285,6 +315,27 @@ export default function TrackGallery({
             })}
           </div>
         </div>
+      )}
+      {viewMode === 'list' && transitionHistogram.seen > 0 && (
+        <>
+          <CostLineChart
+            title="Transition variation"
+            tooltip={`Per-position transition cost between consecutive tracks in the current sort order. Raw shows each transition; smoothed is a moving average (window ${trendSeries.transition.window}); cumulative is the running average, useful for spotting drift over the playlist.`}
+            series={[
+              { label: 'Raw', values: trendSeries.transition.raw, style: 'raw' },
+              { label: 'Smoothed', values: trendSeries.transition.smoothed, style: 'smoothed' },
+              { label: 'Cumulative', values: trendSeries.transition.cumulative, style: 'cumulative' },
+            ]}
+          />
+          <CostLineChart
+            title="Isolation variation"
+            tooltip={`Per-track isolation cost — distance from each track to its nearest harmonic/rhythmic neighbor in the playlist. Smoothed is a moving average (window ${trendSeries.isolation.window}).`}
+            series={[
+              { label: 'Raw', values: trendSeries.isolation.raw, style: 'raw' },
+              { label: 'Smoothed', values: trendSeries.isolation.smoothed, style: 'smoothed' },
+            ]}
+          />
+        </>
       )}
       <div className={`gallery-scroll${viewMode === 'list' ? ' list-mode' : ''}`} ref={scrollRef}>
         {viewMode === 'list' && (

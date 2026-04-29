@@ -58,3 +58,41 @@ export function costWidthPct(cost: number): number {
   const clamped = Math.max(0, Math.min(TRANSITION_MAX, cost));
   return (clamped / TRANSITION_MAX) * 100;
 }
+
+export function movingAverage(
+  values: Array<number | null>,
+  window: number
+): Array<number | null> {
+  const w = Math.max(1, Math.floor(window));
+  const half = Math.floor(w / 2);
+  return values.map((v, i) => {
+    if (v == null) return null;
+    let sum = 0;
+    let n = 0;
+    const lo = Math.max(0, i - half);
+    const hi = Math.min(values.length - 1, i + half);
+    for (let j = lo; j <= hi; j++) {
+      const x = values[j];
+      if (x == null) continue;
+      sum += x;
+      n += 1;
+    }
+    return n === 0 ? null : sum / n;
+  });
+}
+
+export function cumulativeAverage(values: Array<number | null>): Array<number | null> {
+  let sum = 0;
+  let n = 0;
+  return values.map((v) => {
+    if (v == null) return n === 0 ? null : sum / n;
+    sum += v;
+    n += 1;
+    return sum / n;
+  });
+}
+
+export function suggestedSmoothingWindow(sampleCount: number): number {
+  if (sampleCount <= 0) return 3;
+  return Math.max(3, Math.round(Math.sqrt(sampleCount)));
+}
