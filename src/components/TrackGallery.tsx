@@ -58,7 +58,16 @@ type Props = { tracks: TrackRow[] };
 
 export default function TrackGallery({ tracks }: Props) {
   const [sort, setSort] = useState<Sort>({ field: 'default', dir: 'desc' });
-  const sorted = useMemo(() => sortTracks(tracks, sort), [tracks, sort]);
+  const [noDataOnly, setNoDataOnly] = useState(false);
+  const noDataCount = useMemo(
+    () => tracks.reduce((n, t) => (t.features == null ? n + 1 : n), 0),
+    [tracks]
+  );
+  const filtered = useMemo(
+    () => (noDataOnly ? tracks.filter((t) => t.features == null) : tracks),
+    [tracks, noDataOnly]
+  );
+  const sorted = useMemo(() => sortTracks(filtered, sort), [filtered, sort]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [columns, setColumns] = useState(4);
@@ -104,7 +113,10 @@ export default function TrackGallery({ tracks }: Props) {
 
   return (
     <section>
-      <h3>Tracks ({tracks.length})</h3>
+      <h3>
+        Tracks ({sorted.length}
+        {noDataOnly && sorted.length !== tracks.length ? ` of ${tracks.length}` : ''})
+      </h3>
       <div className="sort-pills">
         {SORT_OPTIONS.map((opt) => {
           const active = sort.field === opt.field;
@@ -120,6 +132,18 @@ export default function TrackGallery({ tracks }: Props) {
             </button>
           );
         })}
+        <button
+          className={`sort-pill${noDataOnly ? ' active' : ''}`}
+          onClick={() => setNoDataOnly((v) => !v)}
+          disabled={noDataCount === 0}
+          title={
+            noDataCount === 0
+              ? 'Every track has audio features'
+              : 'Show only tracks missing audio features'
+          }
+        >
+          No data ({noDataCount})
+        </button>
       </div>
       <div className="gallery-scroll" ref={scrollRef}>
         <div
