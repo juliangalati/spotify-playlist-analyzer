@@ -110,16 +110,17 @@ export default function TrackGallery({
   }, [sorted, transitionCosts, isolationCosts]);
 
   const transitionHistogram = useMemo(() => {
-    const buckets = 10;
+    const sampleCount = transitionCosts.reduce<number>((n, c) => (c == null ? n : n + 1), 0);
+    const buckets = sampleCount === 0
+      ? 10
+      : Math.max(5, Math.min(12, Math.ceil(Math.sqrt(sampleCount))));
     const counts = new Array<number>(buckets).fill(0);
-    let seen = 0;
     for (const c of transitionCosts) {
       if (c == null) continue;
-      seen += 1;
       const idx = Math.min(buckets - 1, Math.floor((c / TRANSITION_MAX) * buckets));
       counts[idx] += 1;
     }
-    return { counts, seen };
+    return { counts, seen: sampleCount, buckets };
   }, [transitionCosts]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -252,22 +253,33 @@ export default function TrackGallery({
         </button>
       </div>
       {viewMode === 'list' && transitionHistogram.seen > 0 && (
-        <div className="transition-histogram" title="Distribution of transition costs (lower = smoother)">
+        <div className="transition-histogram">
           <div className="transition-histogram-label">
-            Transition cost distribution
+            <span
+              className="transition-histogram-title"
+              data-tooltip={`Histogram of transition costs between consecutive tracks in the current sort order. Cost = Camelot distance + BPM delta (6 BPM ≈ 1 Camelot step). Lower = smoother harmonic/rhythmic flow. ${transitionHistogram.buckets} buckets from ${transitionHistogram.seen} transition${transitionHistogram.seen === 1 ? '' : 's'}.`}
+            >
+              Transition cost distribution
+            </span>
             <span className="transition-histogram-scale">smooth → jarring</span>
           </div>
           <div className="transition-histogram-bars">
             {transitionHistogram.counts.map((count, i) => {
               const max = Math.max(...transitionHistogram.counts, 1);
               const h = (count / max) * 100;
-              const midCost = ((i + 0.5) / transitionHistogram.counts.length) * TRANSITION_MAX;
+              const bucketSize = TRANSITION_MAX / transitionHistogram.buckets;
+              const lo = i * bucketSize;
+              const hi = (i + 1) * bucketSize;
+              const midCost = (lo + hi) / 2;
+              const pct = transitionHistogram.seen === 0
+                ? 0
+                : Math.round((count / transitionHistogram.seen) * 100);
               return (
                 <span
                   key={i}
                   className="transition-histogram-bar"
                   style={{ height: `${h}%`, background: costColor(midCost) }}
-                  title={`${count} transition${count === 1 ? '' : 's'} in this range`}
+                  data-tooltip={`Cost ${lo.toFixed(1)}–${hi.toFixed(1)}: ${count} transition${count === 1 ? '' : 's'} (${pct}%)`}
                 />
               );
             })}
@@ -287,8 +299,8 @@ export default function TrackGallery({
               <span className="list-metric">D</span>
               <span className="list-metric">V</span>
             </span>
-            <span className="list-cost-header" title="Distance from previous track">Trans.</span>
-            <span className="list-cost-header" title="Distance to nearest other track">Isol.</span>
+            <span className="list-cost-header" data-tooltip="Distance from previous track">Trans.</span>
+            <span className="list-cost-header" data-tooltip="Distance to nearest other track">Isol.</span>
             <span className="list-duration">Time</span>
           </div>
         )}
