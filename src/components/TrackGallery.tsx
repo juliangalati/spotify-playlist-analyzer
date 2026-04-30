@@ -24,9 +24,31 @@ type SortField =
   | 'valence'
   | 'camelot'
   | 'harmonic';
-type SortDir = 'asc' | 'desc';
+type SortDir = 'asc' | 'desc' | 'bell' | 'valley';
 
 type Sort = { field: SortField; dir: SortDir };
+
+const NUMERIC_FIELDS: SortField[] = ['bpm', 'energy', 'danceability', 'valence'];
+
+const DIR_GLYPH: Record<SortDir, string> = {
+  asc: ' ↑',
+  desc: ' ↓',
+  bell: ' ∩',
+  valley: ' ∪',
+};
+
+function shapeInterleave<T>(ascending: T[], shape: 'bell' | 'valley'): T[] {
+  const n = ascending.length;
+  if (n <= 2) return shape === 'bell' ? ascending : [...ascending].reverse();
+  const src = shape === 'bell' ? ascending : [...ascending].reverse();
+  const left: T[] = [];
+  const right: T[] = [];
+  for (let i = 0; i < n; i++) {
+    if (i % 2 === 0) left.push(src[i]);
+    else right.unshift(src[i]);
+  }
+  return [...left, ...right];
+}
 
 const SORT_OPTIONS: Array<{ field: SortField; label: string; tooltip: string }> = [
   {
@@ -43,25 +65,26 @@ const SORT_OPTIONS: Array<{ field: SortField; label: string; tooltip: string }> 
   {
     field: 'bpm',
     label: 'BPM',
-    tooltip: 'Tempo in beats per minute. Higher = faster.',
+    tooltip:
+      'Tempo in beats per minute. Higher = faster. Click repeatedly to cycle: ↓ desc → ↑ asc → ∩ bell (builds to a peak in the middle) → ∪ valley (dips in the middle).',
   },
   {
     field: 'energy',
     label: 'Energy',
     tooltip:
-      "Spotify's 0–1 perceptual measure of intensity and activity (loud, fast, noisy tracks score higher). Model output, not a direct physical measurement.",
+      "Spotify's 0–1 perceptual measure of intensity and activity (loud, fast, noisy tracks score higher). Model output, not a direct physical measurement. Click repeatedly to cycle: ↓ desc → ↑ asc → ∩ bell → ∪ valley.",
   },
   {
     field: 'danceability',
     label: 'Danceability',
     tooltip:
-      "Spotify's 0–1 score for how suitable a track is for dancing, based on tempo stability, beat strength, and regularity.",
+      "Spotify's 0–1 score for how suitable a track is for dancing, based on tempo stability, beat strength, and regularity. Click repeatedly to cycle: ↓ desc → ↑ asc → ∩ bell → ∪ valley.",
   },
   {
     field: 'valence',
     label: 'Valence',
     tooltip:
-      "Spotify's 0–1 score for musical positiveness. High valence = happy/cheerful; low valence = sad/angry/tense.",
+      "Spotify's 0–1 score for musical positiveness. High valence = happy/cheerful; low valence = sad/angry/tense. Click repeatedly to cycle: ↓ desc → ↑ asc → ∩ bell → ∪ valley.",
   },
   {
     field: 'camelot',
@@ -84,23 +107,26 @@ function sortTracks(tracks: TrackRow[], sort: Sort): TrackRow[] {
   const withFeatures = tracks.filter((t) => t.features != null);
   const withoutFeatures = tracks.filter((t) => t.features == null);
 
-  const dirMul = sort.dir === 'asc' ? 1 : -1;
-
-  const sorted = [...withFeatures].sort((a, b) => {
+  const ascending = [...withFeatures].sort((a, b) => {
     const fa = a.features!;
     const fb = b.features!;
     if (sort.field === 'camelot') {
       const [an, al] = camelotKey(fa.camelot);
       const [bn, bl] = camelotKey(fb.camelot);
-      if (an !== bn) return (an - bn) * dirMul;
-      return (al < bl ? -1 : al > bl ? 1 : 0) * dirMul;
+      if (an !== bn) return an - bn;
+      return al < bl ? -1 : al > bl ? 1 : 0;
     }
     const va = fa[sort.field as keyof typeof fa] as number;
     const vb = fb[sort.field as keyof typeof fb] as number;
-    return (va - vb) * dirMul;
+    return va - vb;
   });
 
-  return [...sorted, ...withoutFeatures];
+  let ordered: TrackRow[];
+  if (sort.dir === 'asc') ordered = ascending;
+  else if (sort.dir === 'desc') ordered = [...ascending].reverse();
+  else ordered = shapeInterleave(ascending, sort.dir);
+
+  return [...ordered, ...withoutFeatures];
 }
 
 const MIN_COL_WIDTH = 220;
@@ -244,11 +270,14 @@ export default function TrackGallery({
 
   function onPillClick(field: SortField) {
     setSort((prev) => {
-      const hasDirection = field !== 'default' && field !== 'harmonic';
-      if (prev.field === field && hasDirection) {
-        return { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
-      }
-      return { field, dir: 'desc' };
+      if (field === 'default' || field === 'harmonic') return { field, dir: 'desc' };
+      const cycle: SortDir[] = NUMERIC_FIELDS.includes(field)
+        ? ['desc', 'asc', 'bell', 'valley']
+        : ['desc', 'asc'];
+      if (prev.field !== field) return { field, dir: 'desc' };
+      const idx = cycle.indexOf(prev.dir);
+      const next = cycle[(idx + 1) % cycle.length];
+      return { field, dir: next };
     });
   }
 
@@ -307,7 +336,7 @@ export default function TrackGallery({
         {SORT_OPTIONS.map((opt) => {
           const active = sort.field === opt.field;
           const hasDirection = opt.field !== 'default' && opt.field !== 'harmonic';
-          const arrow = active && hasDirection ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+          const arrow = active && hasDirection ? DIR_GLYPH[sort.dir] : '';
           return (
             <button
               key={opt.field}
