@@ -27,14 +27,47 @@ type SortDir = 'asc' | 'desc';
 
 type Sort = { field: SortField; dir: SortDir };
 
-const SORT_OPTIONS: Array<{ field: SortField; label: string }> = [
-  { field: 'default', label: 'Default' },
-  { field: 'harmonic', label: 'Harmonic' },
-  { field: 'bpm', label: 'BPM' },
-  { field: 'energy', label: 'Energy' },
-  { field: 'danceability', label: 'Danceability' },
-  { field: 'valence', label: 'Valence' },
-  { field: 'camelot', label: 'Camelot' },
+const SORT_OPTIONS: Array<{ field: SortField; label: string; tooltip: string }> = [
+  {
+    field: 'default',
+    label: 'Default',
+    tooltip: 'Original order of the playlist as returned by Spotify.',
+  },
+  {
+    field: 'harmonic',
+    label: 'Harmonic',
+    tooltip:
+      'Greedy nearest-neighbor ordering that minimizes transition cost (Camelot distance + BPM delta, 6 BPM ≈ 1 step) so consecutive tracks sound natural together. Starts from the original track #1; ties broken by lowest isolation.',
+  },
+  {
+    field: 'bpm',
+    label: 'BPM',
+    tooltip: 'Tempo in beats per minute. Higher = faster.',
+  },
+  {
+    field: 'energy',
+    label: 'Energy',
+    tooltip:
+      "Spotify's 0–1 perceptual measure of intensity and activity (loud, fast, noisy tracks score higher). Model output, not a direct physical measurement.",
+  },
+  {
+    field: 'danceability',
+    label: 'Danceability',
+    tooltip:
+      "Spotify's 0–1 score for how suitable a track is for dancing, based on tempo stability, beat strength, and regularity.",
+  },
+  {
+    field: 'valence',
+    label: 'Valence',
+    tooltip:
+      "Spotify's 0–1 score for musical positiveness. High valence = happy/cheerful; low valence = sad/angry/tense.",
+  },
+  {
+    field: 'camelot',
+    label: 'Camelot',
+    tooltip:
+      'Musical key mapped to the Camelot Wheel (e.g. 8A = A minor). Sorts by wheel number then letter — useful for finding key-compatible neighbors.',
+  },
 ];
 
 function camelotKey(code: string): [number, string] {
@@ -274,6 +307,7 @@ export default function TrackGallery({
               key={opt.field}
               className={`sort-pill${active ? ' active' : ''}`}
               onClick={() => onPillClick(opt.field)}
+              data-tooltip={opt.tooltip}
             >
               {opt.label}
               {arrow}
@@ -284,10 +318,10 @@ export default function TrackGallery({
           className={`sort-pill${noDataOnly ? ' active' : ''}`}
           onClick={() => setNoDataOnly((v) => !v)}
           disabled={noDataCount === 0}
-          title={
+          data-tooltip={
             noDataCount === 0
-              ? 'Every track has audio features'
-              : 'Show only tracks missing audio features'
+              ? 'Every track in this playlist has audio features.'
+              : "Filter to tracks ReccoBeats doesn't have features for. These can't be sorted by BPM/key/etc. and are excluded from aggregates."
           }
         >
           No data ({noDataCount})
