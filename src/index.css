@@ -1087,6 +1087,9 @@ section { margin-bottom: 32px; }
   );
   height: 2px;
 }
+.cost-line-chart-legend .legend-item.energy .swatch { background: #ff6b6b; }
+.cost-line-chart-legend .legend-item.danceability .swatch { background: #5eead4; }
+.cost-line-chart-legend .legend-item.valence .swatch { background: #fbbf24; }
 
 .cost-line-chart-canvas {
   position: relative;
@@ -1161,6 +1164,9 @@ section { margin-bottom: 32px; }
     transparent 3px 5px
   );
 }
+.cost-line-chart-readout-row .readout-swatch.energy { background: #ff6b6b; }
+.cost-line-chart-readout-row .readout-swatch.danceability { background: #5eead4; }
+.cost-line-chart-readout-row .readout-swatch.valence { background: #fbbf24; }
 .cost-line-chart-readout-row .readout-value {
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);

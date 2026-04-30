@@ -213,6 +213,13 @@ export default function TrackGallery({
     };
   }, [transitionCosts, isolationCosts]);
 
+  const featureSeries = useMemo(() => {
+    const energy = sorted.map((t) => t.features?.energy ?? null);
+    const danceability = sorted.map((t) => t.features?.danceability ?? null);
+    const valence = sorted.map((t) => t.features?.valence ?? null);
+    return { energy, danceability, valence };
+  }, [sorted]);
+
   const transitionHistogram = useMemo(() => {
     const sampleCount = transitionCosts.reduce<number>((n, c) => (c == null ? n : n + 1), 0);
     const buckets = sampleCount === 0
@@ -427,6 +434,16 @@ export default function TrackGallery({
             series={[
               { label: 'Raw', values: trendSeries.isolation.raw, style: 'raw' },
               { label: 'Smoothed', values: trendSeries.isolation.smoothed, style: 'smoothed' },
+            ]}
+          />
+          <CostLineChart
+            title="Feature variation"
+            tooltip="Per-track energy (red), danceability (teal), and valence (amber) across the current sort order. All three are Spotify model outputs on a 0–1 scale — energy is intensity, danceability is how groove-forward the track feels, valence is emotional positivity."
+            maxY={1}
+            series={[
+              { label: 'Energy', values: featureSeries.energy, style: 'energy' },
+              { label: 'Danceability', values: featureSeries.danceability, style: 'danceability' },
+              { label: 'Valence', values: featureSeries.valence, style: 'valence' },
             ]}
           />
         </>

@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { TRANSITION_MAX, costColor } from '../transition';
 
-type SeriesStyle = 'raw' | 'smoothed' | 'cumulative';
+type SeriesStyle =
+  | 'raw'
+  | 'smoothed'
+  | 'cumulative'
+  | 'energy'
+  | 'danceability'
+  | 'valence';
 
 export type CostLineSeries = {
   label: string;
@@ -29,6 +35,9 @@ const MARGIN = { top: 6, right: 24, bottom: 18, left: 28 };
 const STROKE_ACCENT = '#1ed760';
 const STROKE_SMOOTHED = '#ffffff';
 const STROKE_CUMULATIVE = '#b3b3b3';
+const STROKE_ENERGY = '#ff6b6b';
+const STROKE_DANCEABILITY = '#5eead4';
+const STROKE_VALENCE = '#fbbf24';
 
 function styleAttrs(style: SeriesStyle): {
   stroke: string;
@@ -48,6 +57,12 @@ function styleAttrs(style: SeriesStyle): {
         strokeOpacity: 1,
         strokeDasharray: '4 3',
       };
+    case 'energy':
+      return { stroke: STROKE_ENERGY, strokeWidth: 1.75, strokeOpacity: 1 };
+    case 'danceability':
+      return { stroke: STROKE_DANCEABILITY, strokeWidth: 1.75, strokeOpacity: 1 };
+    case 'valence':
+      return { stroke: STROKE_VALENCE, strokeWidth: 1.75, strokeOpacity: 1 };
   }
 }
 
