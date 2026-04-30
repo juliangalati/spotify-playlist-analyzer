@@ -10,6 +10,7 @@ import {
   cumulativeAverage,
   harmonicSort,
   movingAverage,
+  spreadByArtistAlbum,
   suggestedSmoothingWindow,
   TRANSITION_MAX,
 } from '../transition';
@@ -124,6 +125,7 @@ export default function TrackGallery({
 }: Props) {
   const [sort, setSort] = useState<Sort>({ field: 'default', dir: 'desc' });
   const [noDataOnly, setNoDataOnly] = useState(false);
+  const [artistSpread, setArtistSpread] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const noDataCount = useMemo(
     () => tracks.reduce((n, t) => (t.features == null ? n + 1 : n), 0),
@@ -135,7 +137,11 @@ export default function TrackGallery({
     if (keyFilter) list = list.filter((t) => t.features?.camelot === keyFilter);
     return list;
   }, [tracks, noDataOnly, keyFilter]);
-  const sorted = useMemo(() => sortTracks(filtered, sort), [filtered, sort]);
+  const sorted = useMemo(() => {
+    const base = sortTracks(filtered, sort);
+    if (!artistSpread || sort.field === 'default') return base;
+    return spreadByArtistAlbum(base);
+  }, [filtered, sort, artistSpread]);
   const positionById = useMemo(() => {
     const map = new Map<string, number>();
     tracks.forEach((t, i) => map.set(t.id, i + 1));
@@ -325,6 +331,18 @@ export default function TrackGallery({
           }
         >
           No data ({noDataCount})
+        </button>
+        <button
+          className={`sort-pill${artistSpread && sort.field !== 'default' ? ' active' : ''}`}
+          onClick={() => setArtistSpread((v) => !v)}
+          disabled={sort.field === 'default'}
+          data-tooltip={
+            sort.field === 'default'
+              ? 'Select a sort other than Default to enable artist/album spread.'
+              : "Rearrange to avoid consecutive tracks by the same artist (or same album when that's not possible). Keeps the current sort's overall shape; small local swaps only."
+          }
+        >
+          Spread
         </button>
       </div>
       {viewMode === 'list' && transitionHistogram.seen > 0 && (

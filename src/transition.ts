@@ -151,3 +151,61 @@ export function harmonicSort(tracks: TrackRow[]): TrackRow[] {
 
   return [...order, ...withoutFeatures];
 }
+
+export const SPREAD_DEFAULT_WINDOW = 4;
+
+function sharesArtist(a: TrackRow, b: TrackRow): boolean {
+  const bIds = new Set(b.artists.map((x) => x.id));
+  for (const x of a.artists) if (bIds.has(x.id)) return true;
+  return false;
+}
+
+function sharesAlbum(a: TrackRow, b: TrackRow): boolean {
+  const an = a.album?.name?.trim().toLowerCase();
+  const bn = b.album?.name?.trim().toLowerCase();
+  if (!an || !bn) return false;
+  return an === bn;
+}
+
+export function spreadByArtistAlbum(
+  tracks: TrackRow[],
+  lookaheadWindow: number = SPREAD_DEFAULT_WINDOW
+): TrackRow[] {
+  const head = tracks.filter((t) => t.features != null);
+  const tail = tracks.filter((t) => t.features == null);
+  if (head.length <= 2) return [...head, ...tail];
+
+  const out = [...head];
+  const window = Math.max(1, Math.floor(lookaheadWindow));
+
+  for (let i = 1; i < out.length; i++) {
+    const prev = out[i - 1];
+    const here = out[i];
+    if (!sharesArtist(prev, here)) continue;
+
+    let swapIdx = -1;
+    const hiExclusive = Math.min(out.length, i + window + 1);
+
+    for (let j = i + 1; j < hiExclusive; j++) {
+      if (sharesArtist(prev, out[j])) continue;
+      swapIdx = j;
+      break;
+    }
+
+    if (swapIdx === -1) {
+      for (let j = i + 1; j < hiExclusive; j++) {
+        if (sharesAlbum(prev, out[j])) continue;
+        swapIdx = j;
+        break;
+      }
+    }
+
+    if (swapIdx !== -1) {
+      const tmp = out[i];
+      out[i] = out[swapIdx];
+      out[swapIdx] = tmp;
+    }
+  }
+
+  return [...out, ...tail];
+}
