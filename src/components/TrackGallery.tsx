@@ -437,6 +437,7 @@ export default function TrackGallery({
             <span className="list-pos">#</span>
             <span />
             <span>Title</span>
+            <span />
             <span className="list-stats">
               <span className="list-bpm">BPM</span>
               <span className="list-camelot">Key</span>
