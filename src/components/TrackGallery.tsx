@@ -1,8 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import type { TrackRow } from '../types';
 import TrackCard from './TrackCard';
 import TrackListRow from './TrackListRow';
+import SortableTrackListRow from './SortableTrackListRow';
 import {
   computeIsolationCosts,
   computeTransitionCosts,
@@ -23,7 +37,8 @@ type SortField =
   | 'danceability'
   | 'valence'
   | 'camelot'
-  | 'harmonic';
+  | 'harmonic'
+  | 'custom';
 type SortDir = 'asc' | 'desc' | 'bell' | 'valley';
 
 type Sort = { field: SortField; dir: SortDir };
@@ -92,6 +107,12 @@ const SORT_OPTIONS: Array<{ field: SortField; label: string; tooltip: string }> 
     tooltip:
       'Musical key mapped to the Camelot Wheel (e.g. 8A = A minor). Sorts by wheel number then letter — useful for finding key-compatible neighbors.',
   },
+  {
+    field: 'custom',
+    label: 'Custom',
+    tooltip:
+      'Drag-and-drop mode (list view only). Seeds from the current order; rearrange tracks manually. Switching to another sort discards the custom order.',
+  },
 ];
 
 function camelotKey(code: string): [number, string] {
@@ -100,9 +121,30 @@ function camelotKey(code: string): [number, string] {
   return [Number.isFinite(num) ? num : 99, letter];
 }
 
-function sortTracks(tracks: TrackRow[], sort: Sort): TrackRow[] {
+function sortTracks(
+  tracks: TrackRow[],
+  sort: Sort,
+  customOrder: string[] | null
+): TrackRow[] {
   if (sort.field === 'default') return tracks;
   if (sort.field === 'harmonic') return harmonicSort(tracks);
+  if (sort.field === 'custom') {
+    if (!customOrder) return tracks;
+    const byId = new Map(tracks.map((t) => [t.id, t]));
+    const ordered: TrackRow[] = [];
+    const seen = new Set<string>();
+    for (const id of customOrder) {
+      const t = byId.get(id);
+      if (t) {
+        ordered.push(t);
+        seen.add(id);
+      }
+    }
+    for (const t of tracks) {
+      if (!seen.has(t.id)) ordered.push(t);
+    }
+    return ordered;
+  }
 
   const withFeatures = tracks.filter((t) => t.features != null);
   const withoutFeatures = tracks.filter((t) => t.features == null);
@@ -153,6 +195,7 @@ export default function TrackGallery({
   const [noDataOnly, setNoDataOnly] = useState(false);
   const [artistSpread, setArtistSpread] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [customOrder, setCustomOrder] = useState<string[] | null>(null);
   const noDataCount = useMemo(
     () => tracks.reduce((n, t) => (t.features == null ? n + 1 : n), 0),
     [tracks]
@@ -164,10 +207,10 @@ export default function TrackGallery({
     return list;
   }, [tracks, noDataOnly, keyFilter]);
   const sorted = useMemo(() => {
-    const base = sortTracks(filtered, sort);
-    if (!artistSpread || sort.field === 'default') return base;
+    const base = sortTracks(filtered, sort, customOrder);
+    if (!artistSpread || sort.field === 'default' || sort.field === 'custom') return base;
     return spreadByArtistAlbum(base);
-  }, [filtered, sort, artistSpread]);
+  }, [filtered, sort, artistSpread, customOrder]);
   const positionById = useMemo(() => {
     const map = new Map<string, number>();
     tracks.forEach((t, i) => map.set(t.id, i + 1));
@@ -277,6 +320,16 @@ export default function TrackGallery({
 
   function onPillClick(field: SortField) {
     setSort((prev) => {
+      if (field === 'custom') {
+        if (prev.field !== 'custom') {
+          setCustomOrder(sorted.map((t) => t.id));
+          if (viewMode !== 'list') setViewMode('list');
+        }
+        return { field, dir: 'desc' };
+      }
+      if (prev.field === 'custom') {
+        setCustomOrder(null);
+      }
       if (field === 'default' || field === 'harmonic') return { field, dir: 'desc' };
       const cycle: SortDir[] = NUMERIC_FIELDS.includes(field)
         ? ['desc', 'asc', 'bell', 'valley']
@@ -287,6 +340,33 @@ export default function TrackGallery({
       return { field, dir: next };
     });
   }
+
+  function onViewModeChange(mode: ViewMode) {
+    if (mode === 'grid' && sort.field === 'custom') {
+      setCustomOrder(null);
+      setSort({ field: 'default', dir: 'desc' });
+    }
+    setViewMode(mode);
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
+  );
+
+  function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setCustomOrder((prev) => {
+      const base = prev ?? sorted.map((t) => t.id);
+      const from = base.indexOf(String(active.id));
+      const to = base.indexOf(String(over.id));
+      if (from < 0 || to < 0) return prev;
+      return arrayMove(base, from, to);
+    });
+  }
+
+  const isCustom = sort.field === 'custom' && viewMode === 'list';
+  const sortedIds = useMemo(() => sorted.map((t) => t.id), [sorted]);
 
   const filterActive = noDataOnly || keyFilter != null;
 
@@ -300,9 +380,9 @@ export default function TrackGallery({
         <div className="view-toggle" role="group" aria-label="View mode">
           <button
             className={`view-toggle-btn${viewMode === 'grid' ? ' active' : ''}`}
-            onClick={() => setViewMode('grid')}
+            onClick={() => onViewModeChange('grid')}
             aria-pressed={viewMode === 'grid'}
-            title="Grid view"
+            title={sort.field === 'custom' ? 'Grid view (exits Custom sort)' : 'Grid view'}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
               <rect x="1" y="1" width="5" height="5" rx="1" />
@@ -314,7 +394,7 @@ export default function TrackGallery({
           </button>
           <button
             className={`view-toggle-btn${viewMode === 'list' ? ' active' : ''}`}
-            onClick={() => setViewMode('list')}
+            onClick={() => onViewModeChange('list')}
             aria-pressed={viewMode === 'list'}
             title="List view"
           >
@@ -342,7 +422,8 @@ export default function TrackGallery({
       <div className="sort-pills">
         {SORT_OPTIONS.map((opt) => {
           const active = sort.field === opt.field;
-          const hasDirection = opt.field !== 'default' && opt.field !== 'harmonic';
+          const hasDirection =
+            opt.field !== 'default' && opt.field !== 'harmonic' && opt.field !== 'custom';
           const arrow = active && hasDirection ? DIR_GLYPH[sort.dir] : '';
           return (
             <button
@@ -369,13 +450,15 @@ export default function TrackGallery({
           No data ({noDataCount})
         </button>
         <button
-          className={`spread-toggle${artistSpread && sort.field !== 'default' ? ' active' : ''}`}
+          className={`spread-toggle${artistSpread && sort.field !== 'default' && sort.field !== 'custom' ? ' active' : ''}`}
           onClick={() => setArtistSpread((v) => !v)}
-          disabled={sort.field === 'default'}
-          aria-pressed={artistSpread && sort.field !== 'default'}
+          disabled={sort.field === 'default' || sort.field === 'custom'}
+          aria-pressed={artistSpread && sort.field !== 'default' && sort.field !== 'custom'}
           data-tooltip={
             sort.field === 'default'
               ? 'Select a sort other than Default to enable artist/album spread.'
+              : sort.field === 'custom'
+              ? 'Spread is disabled in Custom sort — drag tracks manually instead.'
               : "Post-sort modifier: rearrange to avoid consecutive tracks by the same artist (or same album when that's not possible). Keeps the current sort's overall shape; small local swaps only."
           }
         >
@@ -448,9 +531,10 @@ export default function TrackGallery({
           />
         </>
       )}
-      <div className={`gallery-scroll${viewMode === 'list' ? ' list-mode' : ''}`} ref={scrollRef}>
+      <div className={`gallery-scroll${viewMode === 'list' ? ' list-mode' : ''}${isCustom ? ' custom-sort' : ''}`} ref={scrollRef}>
         {viewMode === 'list' && (
-          <div className="track-list-header">
+          <div className={`track-list-header${isCustom ? ' custom-sort' : ''}`}>
+            {isCustom && <span />}
             <span className="list-pos">#</span>
             <span />
             <span>Title</span>
@@ -467,47 +551,86 @@ export default function TrackGallery({
             <span className="list-duration">Time</span>
           </div>
         )}
-        <div
-          className="gallery-rows"
-          style={{ height: virtualizer.getTotalSize() }}
-        >
-          {virtualizer.getVirtualItems().map((vr) => {
-            const row = rows[vr.index];
-            if (!row) return null;
-            return (
+        {isCustom ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={sortedIds} strategy={verticalListSortingStrategy}>
               <div
-                key={vr.key}
-                className={`gallery-row${viewMode === 'list' ? ' list-row' : ''}`}
-                style={{
-                  transform: `translateY(${vr.start}px)`,
-                  gridTemplateColumns:
-                    viewMode === 'list'
-                      ? '1fr'
-                      : `repeat(${columns}, minmax(0, 1fr))`,
-                }}
+                className="gallery-rows"
+                style={{ height: virtualizer.getTotalSize() }}
               >
-                {row.map((t) => {
-                  const costs = costByIndex.get(t.id);
-                  return viewMode === 'list' ? (
-                    <TrackListRow
-                      key={t.id}
-                      track={t}
-                      position={positionById.get(t.id)}
-                      transitionCost={costs?.transition ?? null}
-                      isolationCost={costs?.isolation ?? null}
-                    />
-                  ) : (
-                    <TrackCard
-                      key={t.id}
-                      track={t}
-                      position={positionById.get(t.id)}
-                    />
+                {virtualizer.getVirtualItems().map((vr) => {
+                  const row = rows[vr.index];
+                  if (!row) return null;
+                  return (
+                    <div
+                      key={vr.key}
+                      className="gallery-row list-row"
+                      style={{
+                        transform: `translateY(${vr.start}px)`,
+                        gridTemplateColumns: '1fr',
+                      }}
+                    >
+                      {row.map((t) => {
+                        const costs = costByIndex.get(t.id);
+                        return (
+                          <SortableTrackListRow
+                            key={t.id}
+                            track={t}
+                            position={positionById.get(t.id)}
+                            transitionCost={costs?.transition ?? null}
+                            isolationCost={costs?.isolation ?? null}
+                          />
+                        );
+                      })}
+                    </div>
                   );
                 })}
               </div>
-            );
-          })}
-        </div>
+            </SortableContext>
+          </DndContext>
+        ) : (
+          <div
+            className="gallery-rows"
+            style={{ height: virtualizer.getTotalSize() }}
+          >
+            {virtualizer.getVirtualItems().map((vr) => {
+              const row = rows[vr.index];
+              if (!row) return null;
+              return (
+                <div
+                  key={vr.key}
+                  className={`gallery-row${viewMode === 'list' ? ' list-row' : ''}`}
+                  style={{
+                    transform: `translateY(${vr.start}px)`,
+                    gridTemplateColumns:
+                      viewMode === 'list'
+                        ? '1fr'
+                        : `repeat(${columns}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {row.map((t) => {
+                    const costs = costByIndex.get(t.id);
+                    return viewMode === 'list' ? (
+                      <TrackListRow
+                        key={t.id}
+                        track={t}
+                        position={positionById.get(t.id)}
+                        transitionCost={costs?.transition ?? null}
+                        isolationCost={costs?.isolation ?? null}
+                      />
+                    ) : (
+                      <TrackCard
+                        key={t.id}
+                        track={t}
+                        position={positionById.get(t.id)}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </section>
   );

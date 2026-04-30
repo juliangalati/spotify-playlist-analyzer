@@ -1,3 +1,4 @@
+import { forwardRef, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import type { TrackRow } from '../types';
 import { formatDuration, round } from '../util';
 import { costColor, costWidthPct } from '../transition';
@@ -7,6 +8,10 @@ type Props = {
   position?: number;
   transitionCost?: number | null;
   isolationCost?: number | null;
+  dragHandle?: ReactNode;
+  style?: CSSProperties;
+  className?: string;
+  rootProps?: HTMLAttributes<HTMLDivElement>;
 };
 
 function CostCell({ cost, label }: { cost: number | null | undefined; label: string }) {
@@ -32,21 +37,32 @@ function CostCell({ cost, label }: { cost: number | null | undefined; label: str
   );
 }
 
-export default function TrackListRow({
-  track,
-  position,
-  transitionCost,
-  isolationCost,
-}: Props) {
+const TrackListRow = forwardRef<HTMLDivElement, Props>(function TrackListRow(
+  {
+    track,
+    position,
+    transitionCost,
+    isolationCost,
+    dragHandle,
+    style,
+    className: extraClassName,
+    rootProps,
+  },
+  ref
+) {
   const f = track.features;
   const artists = track.artists.map((a) => a.name).join(', ');
-  const className = `track-list-row${f == null ? ' missing' : ''}`;
+  const className = `track-list-row${f == null ? ' missing' : ''}${dragHandle ? ' draggable' : ''}${extraClassName ? ' ' + extraClassName : ''}`;
 
   return (
     <div
+      ref={ref}
       className={className}
       title={f == null ? 'Not in ReccoBeats catalog' : undefined}
+      style={style}
+      {...rootProps}
     >
+      {dragHandle}
       <span className="list-pos">{position != null ? position : ''}</span>
       <div className="list-cover">
         {track.cover ? <img src={track.cover} alt="" /> : null}
@@ -92,4 +108,6 @@ export default function TrackListRow({
       <span className="list-duration">{formatDuration(track.duration_ms)}</span>
     </div>
   );
-}
+});
+
+export default TrackListRow;

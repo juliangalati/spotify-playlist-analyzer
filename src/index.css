@@ -920,6 +920,45 @@ section { margin-bottom: 32px; }
   .track-list-row > .list-cost { display: none; }
 }
 
+/* Custom sort — drag and drop */
+.track-list-header.custom-sort {
+  grid-template-columns: 20px 28px 40px 1fr 28px 340px 88px 88px 48px;
+}
+.track-list-row.draggable {
+  grid-template-columns: 20px 28px 40px 1fr 28px 340px 88px 88px 48px;
+  touch-action: none;
+}
+.track-list-row.dragging {
+  background: var(--row-hover);
+  box-shadow: var(--shadow-medium);
+}
+.list-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: grab;
+  transition: color 0.15s;
+}
+.list-drag-handle:hover { color: var(--text-primary); }
+.list-drag-handle:active { cursor: grabbing; }
+.list-drag-handle svg { fill: currentColor; }
+
+@media (max-width: 768px) {
+  .track-list-header.custom-sort {
+    grid-template-columns: 20px 24px 36px 1fr 28px 48px;
+  }
+  .track-list-row.draggable {
+    grid-template-columns: 20px 24px 36px 1fr 28px 48px;
+  }
+}
+
 /* Transition histogram */
 .transition-histogram {
   background: var(--surface);
