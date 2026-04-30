@@ -333,16 +333,18 @@ export default function TrackGallery({
           No data ({noDataCount})
         </button>
         <button
-          className={`sort-pill${artistSpread && sort.field !== 'default' ? ' active' : ''}`}
+          className={`spread-toggle${artistSpread && sort.field !== 'default' ? ' active' : ''}`}
           onClick={() => setArtistSpread((v) => !v)}
           disabled={sort.field === 'default'}
+          aria-pressed={artistSpread && sort.field !== 'default'}
           data-tooltip={
             sort.field === 'default'
               ? 'Select a sort other than Default to enable artist/album spread.'
-              : "Rearrange to avoid consecutive tracks by the same artist (or same album when that's not possible). Keeps the current sort's overall shape; small local swaps only."
+              : "Post-sort modifier: rearrange to avoid consecutive tracks by the same artist (or same album when that's not possible). Keeps the current sort's overall shape; small local swaps only."
           }
         >
           Spread
+          <span className="spread-switch" aria-hidden="true" />
         </button>
       </div>
       {viewMode === 'list' && transitionHistogram.seen > 0 && (
