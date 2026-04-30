@@ -10,7 +10,8 @@ Sibling project to `spotify-track-analyzer` (single-track version). This one is 
 - **Playlist header** — cover art, name, owner, track count, total duration, coverage badge when some tracks aren't in the audio-feature catalog.
 - **Summary grid** — averages for BPM, energy, danceability, valence, loudness; dominant key; major/minor split; total duration.
 - **Camelot Wheel (distribution view)** — 24-slot D3 wheel where each slot's opacity scales with how many tracks are in that key; accent stroke on the most-populated slot.
-- **Track gallery** — virtualized card grid (`@tanstack/react-virtual`) that stays smooth at 500+ tracks; sortable by BPM, energy, danceability, valence, or Camelot code. Tracks missing ReccoBeats data get a highlighted border and "No data" badge.
+- **Track gallery** — virtualized card grid (`@tanstack/react-virtual`) that stays smooth at 500+ tracks; sortable by BPM, energy, danceability, valence, Camelot code, or **Harmonic** (the transition/isolation-aware ordering described below). Tracks missing ReccoBeats data get a highlighted border and "No data" badge.
+- **List view** — a compact row view with per-track **Transition** and **Isolation** cost bars, a transition-cost **histogram**, and two **variation line charts** (raw + smoothed + cumulative transition; raw + smoothed isolation) to show how harmonic/rhythmic flow drifts across the playlist.
 - **JSON export** — clean structured output with a one-click copy button.
 
 ## Stack
@@ -38,6 +39,42 @@ This is important and changed recently. Spotify Web API behavior under the curre
 | A **Spotify-owned algorithmic** playlist (Discover Weekly, Daily Mix, etc.) | ❌ 403 — same policy |
 
 To analyze playlists beyond your own account, you'd need to request **Extended Mode** access for your app from the Spotify Developer Dashboard. That's a manual approval by Spotify and isn't something the app can bypass.
+
+## Harmonic sort
+
+The **Harmonic** sort reorders the playlist so consecutive tracks sound natural together — keys should be Camelot-compatible and tempos close enough to feel continuous. It's implemented as a greedy nearest-neighbor walk over a two-part cost metric.
+
+### Transition cost (between two consecutive tracks)
+
+```
+transition_cost(a, b) = camelot_distance(a, b) + |bpm_a − bpm_b| / 6
+```
+
+- **Camelot distance** — `min(|n_a − n_b|, 12 − |n_a − n_b|)` on the wheel number, plus `+1` if the mode letter differs (A↔B). Range 0–7. `0` = identical key; `1` = Camelot-compatible neighbor (same key's relative major/minor, or adjacent on the wheel).
+- **BPM delta**, normalized so **6 BPM ≈ 1 Camelot step**. This weighting treats harmonic compatibility and tempo continuity as roughly equal contributors — a 6 BPM jump is about as disruptive as moving one slot on the Camelot Wheel.
+
+Lower is smoother. The metric is clamped at `10` for rendering (bar widths, histogram buckets, line-chart Y axis).
+
+### Isolation cost (per track, order-independent)
+
+For each track `t`, `isolation(t) = min over all other tracks u of transition_cost(t, u)`.
+
+It answers "if I had to put this track next to *something* in the playlist, what's the best I could do?" A high isolation score flags a harmonic/rhythmic outlier. Isolation is used as a **tiebreaker** during the Harmonic sort — no pruning, every track stays in the final ordering.
+
+### Algorithm
+
+1. Tracks missing audio features are held out; they're appended in their original relative order at the end.
+2. Pre-compute isolation for every feature-bearing track.
+3. **Start from the original playlist's track #1** (so the harmonic order is a reordering of *your* playlist, not a synthetic one).
+4. At each step, from the current track look at every unvisited feature-bearing track and compute its transition cost. Let `best` be the minimum.
+5. Collect all candidates within `best + 0.5` and pick the one with the **lowest isolation** (break further ties by lower cost). The idea: when multiple next-tracks are roughly equally good, prefer the most "connected" one — it leaves richer options for the rest of the walk instead of painting us into a corner.
+6. Repeat until every feature-bearing track is placed.
+
+The sort is deterministic given a playlist. Switching the active sort in the UI recomputes the Transition / Isolation columns, the histogram, and the two variation line charts against the new order — a direct visual comparison of how much smoother the Harmonic order is than, say, BPM-ascending or the original Spotify order.
+
+### What about Energy?
+
+Energy shapes the emotional arc of a playlist (build-up, peak, wind-down) but doesn't determine whether consecutive tracks sound *consonant*. The Harmonic sort intentionally optimizes for consonance and tempo flow only; energy remains a separate sort you can apply when you care about the trajectory rather than the transitions.
 
 ## Setup
 

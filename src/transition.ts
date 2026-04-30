@@ -96,3 +96,58 @@ export function suggestedSmoothingWindow(sampleCount: number): number {
   if (sampleCount <= 0) return 3;
   return Math.max(3, Math.round(Math.sqrt(sampleCount)));
 }
+
+export const HARMONIC_TIE_EPSILON = 0.5;
+
+export function harmonicSort(tracks: TrackRow[]): TrackRow[] {
+  const withFeatures = tracks.filter((t) => t.features != null);
+  const withoutFeatures = tracks.filter((t) => t.features == null);
+  if (withFeatures.length <= 1) {
+    return [...withFeatures, ...withoutFeatures];
+  }
+
+  const isolationByIndex = computeIsolationCosts(withFeatures);
+  const visited = new Set<number>();
+  const order: TrackRow[] = [];
+
+  const startIdx = 0;
+  visited.add(startIdx);
+  order.push(withFeatures[startIdx]);
+
+  let currentIdx = startIdx;
+  while (visited.size < withFeatures.length) {
+    const current = withFeatures[currentIdx];
+    let bestCost = Infinity;
+    const candidates: Array<{ idx: number; cost: number; isolation: number }> = [];
+    for (let j = 0; j < withFeatures.length; j++) {
+      if (visited.has(j)) continue;
+      const cost = trackDistance(current, withFeatures[j]);
+      if (cost == null) continue;
+      if (cost < bestCost) bestCost = cost;
+      candidates.push({
+        idx: j,
+        cost,
+        isolation: isolationByIndex[j] ?? Infinity,
+      });
+    }
+    if (candidates.length === 0) break;
+
+    const tieThreshold = bestCost + HARMONIC_TIE_EPSILON;
+    const ties = candidates.filter((c) => c.cost <= tieThreshold);
+    ties.sort((a, b) => {
+      if (a.isolation !== b.isolation) return a.isolation - b.isolation;
+      return a.cost - b.cost;
+    });
+
+    const next = ties[0];
+    visited.add(next.idx);
+    order.push(withFeatures[next.idx]);
+    currentIdx = next.idx;
+  }
+
+  for (let j = 0; j < withFeatures.length; j++) {
+    if (!visited.has(j)) order.push(withFeatures[j]);
+  }
+
+  return [...order, ...withoutFeatures];
+}

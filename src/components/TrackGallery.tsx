@@ -8,19 +8,28 @@ import {
   computeTransitionCosts,
   costColor,
   cumulativeAverage,
+  harmonicSort,
   movingAverage,
   suggestedSmoothingWindow,
   TRANSITION_MAX,
 } from '../transition';
 import CostLineChart from './CostLineChart';
 
-type SortField = 'default' | 'bpm' | 'energy' | 'danceability' | 'valence' | 'camelot';
+type SortField =
+  | 'default'
+  | 'bpm'
+  | 'energy'
+  | 'danceability'
+  | 'valence'
+  | 'camelot'
+  | 'harmonic';
 type SortDir = 'asc' | 'desc';
 
 type Sort = { field: SortField; dir: SortDir };
 
 const SORT_OPTIONS: Array<{ field: SortField; label: string }> = [
   { field: 'default', label: 'Default' },
+  { field: 'harmonic', label: 'Harmonic' },
   { field: 'bpm', label: 'BPM' },
   { field: 'energy', label: 'Energy' },
   { field: 'danceability', label: 'Danceability' },
@@ -36,6 +45,7 @@ function camelotKey(code: string): [number, string] {
 
 function sortTracks(tracks: TrackRow[], sort: Sort): TrackRow[] {
   if (sort.field === 'default') return tracks;
+  if (sort.field === 'harmonic') return harmonicSort(tracks);
 
   const withFeatures = tracks.filter((t) => t.features != null);
   const withoutFeatures = tracks.filter((t) => t.features == null);
@@ -51,9 +61,8 @@ function sortTracks(tracks: TrackRow[], sort: Sort): TrackRow[] {
       if (an !== bn) return (an - bn) * dirMul;
       return (al < bl ? -1 : al > bl ? 1 : 0) * dirMul;
     }
-    if (sort.field === 'default') return 0;
-    const va = fa[sort.field];
-    const vb = fb[sort.field];
+    const va = fa[sort.field as keyof typeof fa] as number;
+    const vb = fb[sort.field as keyof typeof fb] as number;
     return (va - vb) * dirMul;
   });
 
@@ -196,10 +205,11 @@ export default function TrackGallery({
 
   function onPillClick(field: SortField) {
     setSort((prev) => {
-      if (prev.field === field) {
+      const hasDirection = field !== 'default' && field !== 'harmonic';
+      if (prev.field === field && hasDirection) {
         return { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
       }
-      return { field, dir: field === 'default' ? 'desc' : 'desc' };
+      return { field, dir: 'desc' };
     });
   }
 
@@ -257,7 +267,8 @@ export default function TrackGallery({
       <div className="sort-pills">
         {SORT_OPTIONS.map((opt) => {
           const active = sort.field === opt.field;
-          const arrow = active && opt.field !== 'default' ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+          const hasDirection = opt.field !== 'default' && opt.field !== 'harmonic';
+          const arrow = active && hasDirection ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
           return (
             <button
               key={opt.field}
