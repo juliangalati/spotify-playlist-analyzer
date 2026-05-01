@@ -196,6 +196,7 @@ export default function TrackGallery({
   const [artistSpread, setArtistSpread] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [customOrder, setCustomOrder] = useState<string[] | null>(null);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
   const noDataCount = useMemo(
     () => tracks.reduce((n, t) => (t.features == null ? n + 1 : n), 0),
     [tracks]
@@ -370,6 +371,19 @@ export default function TrackGallery({
 
   const filterActive = noDataOnly || keyFilter != null;
 
+  async function onExportOrder() {
+    const ids = sorted.map((t) => t.id);
+    const json = JSON.stringify(ids);
+    try {
+      await navigator.clipboard.writeText(json);
+      setExportMsg(`Copied ${ids.length} IDs`);
+    } catch {
+      setExportMsg('Copy failed — see console');
+      console.log(json);
+    }
+    setTimeout(() => setExportMsg(null), 2500);
+  }
+
   return (
     <section>
       <div className="tracks-header">
@@ -377,6 +391,14 @@ export default function TrackGallery({
           Tracks ({sorted.length}
           {filterActive && sorted.length !== tracks.length ? ` of ${tracks.length}` : ''})
         </h3>
+        <button
+          type="button"
+          className="export-order-btn"
+          onClick={onExportOrder}
+          title="Copy the current list order as JSON (an array of Spotify track IDs). Paste into the Spotify-console reorder script."
+        >
+          {exportMsg ?? 'Copy order'}
+        </button>
         <div className="view-toggle" role="group" aria-label="View mode">
           <button
             className={`view-toggle-btn${viewMode === 'grid' ? ' active' : ''}`}
